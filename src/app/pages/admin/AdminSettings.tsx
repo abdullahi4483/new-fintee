@@ -1,10 +1,54 @@
+import { useEffect, useState } from 'react';
 import { Shield, Bell, Database } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { adminService } from '../../lib/services';
 
 export function AdminSettings() {
-  const [autoApproval, setAutoApproval] = useState(false);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [settings, setSettings] = useState({
+    platformName: 'Fintech',
+    supportEmail: 'support@fintech.com',
+    adminEmail: 'admin@fintech.com',
+    emailNotifications: true,
+    withdrawalManualThreshold: '10000',
+    autoApproveEnabled: false,
+    autoApproveMaxAmount: '1000',
+    sessionTimeoutMinutes: 30,
+    apiRateLimitPerHour: 1000,
+  });
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    void adminService
+      .getSettings()
+      .then((data) => {
+        if (active) {
+          setSettings(data);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Unable to load admin settings.');
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function saveSettings() {
+    try {
+      setError('');
+      await adminService.updateSettings(settings);
+      setSuccess('Settings saved.');
+      window.setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save settings.');
+    }
+  }
 
   return (
     <div>
@@ -15,8 +59,18 @@ export function AdminSettings() {
         <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Configure platform settings</p>
       </div>
 
+      {error && (
+        <div className="mb-6 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-[#fca5a5]">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-6 rounded-xl border border-[#10b981]/30 bg-[#10b981]/10 px-4 py-3 text-[#86efac]">
+          {success}
+        </div>
+      )}
+
       <div className="max-w-3xl space-y-6">
-        {/* Security Settings */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -36,7 +90,8 @@ export function AdminSettings() {
               </label>
               <input
                 type="number"
-                defaultValue="10000"
+                value={settings.withdrawalManualThreshold}
+                onChange={(event) => setSettings((current) => ({ ...current, withdrawalManualThreshold: event.target.value }))}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
               <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)', marginTop: '8px' }}>
@@ -50,21 +105,33 @@ export function AdminSettings() {
                   Auto-approve Small Withdrawals
                 </div>
                 <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }}>
-                  Automatically approve withdrawals under $1,000
+                  Automatically approve withdrawals under {settings.autoApproveMaxAmount}
                 </div>
               </div>
               <button
-                onClick={() => setAutoApproval(!autoApproval)}
+                onClick={() => setSettings((current) => ({ ...current, autoApproveEnabled: !current.autoApproveEnabled }))}
                 className={`relative w-12 h-6 rounded-full transition-all ${
-                  autoApproval ? 'bg-[#c9a84c]' : 'bg-white/20'
+                  settings.autoApproveEnabled ? 'bg-[#c9a84c]' : 'bg-white/20'
                 }`}
               >
                 <div
                   className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                    autoApproval ? 'left-7' : 'left-1'
+                    settings.autoApproveEnabled ? 'left-7' : 'left-1'
                   }`}
                 />
               </button>
+            </div>
+
+            <div>
+              <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                Auto-approve Max Amount
+              </label>
+              <input
+                type="number"
+                value={settings.autoApproveMaxAmount}
+                onChange={(event) => setSettings((current) => ({ ...current, autoApproveMaxAmount: event.target.value }))}
+                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
+              />
             </div>
 
             <div>
@@ -73,14 +140,14 @@ export function AdminSettings() {
               </label>
               <input
                 type="number"
-                defaultValue="30"
+                value={settings.sessionTimeoutMinutes}
+                onChange={(event) => setSettings((current) => ({ ...current, sessionTimeoutMinutes: Number(event.target.value) }))}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
             </div>
           </div>
         </motion.div>
 
-        {/* Notification Settings */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -105,14 +172,19 @@ export function AdminSettings() {
                 </div>
               </div>
               <button
-                onClick={() => setEmailNotifications(!emailNotifications)}
+                onClick={() =>
+                  setSettings((current) => ({
+                    ...current,
+                    emailNotifications: !current.emailNotifications,
+                  }))
+                }
                 className={`relative w-12 h-6 rounded-full transition-all ${
-                  emailNotifications ? 'bg-[#c9a84c]' : 'bg-white/20'
+                  settings.emailNotifications ? 'bg-[#c9a84c]' : 'bg-white/20'
                 }`}
               >
                 <div
                   className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
-                    emailNotifications ? 'left-7' : 'left-1'
+                    settings.emailNotifications ? 'left-7' : 'left-1'
                   }`}
                 />
               </button>
@@ -124,14 +196,14 @@ export function AdminSettings() {
               </label>
               <input
                 type="email"
-                defaultValue="admin@fintech.com"
+                value={settings.adminEmail}
+                onChange={(event) => setSettings((current) => ({ ...current, adminEmail: event.target.value }))}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
             </div>
           </div>
         </motion.div>
 
-        {/* System Settings */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -152,7 +224,8 @@ export function AdminSettings() {
               </label>
               <input
                 type="text"
-                defaultValue="Fintech"
+                value={settings.platformName}
+                onChange={(event) => setSettings((current) => ({ ...current, platformName: event.target.value }))}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
             </div>
@@ -163,7 +236,8 @@ export function AdminSettings() {
               </label>
               <input
                 type="email"
-                defaultValue="support@fintech.com"
+                value={settings.supportEmail}
+                onChange={(event) => setSettings((current) => ({ ...current, supportEmail: event.target.value }))}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
             </div>
@@ -174,12 +248,13 @@ export function AdminSettings() {
               </label>
               <input
                 type="number"
-                defaultValue="1000"
+                value={settings.apiRateLimitPerHour}
+                onChange={(event) => setSettings((current) => ({ ...current, apiRateLimitPerHour: Number(event.target.value) }))}
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
             </div>
 
-            <button className="w-full px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105">
+            <button onClick={() => void saveSettings()} className="w-full px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105">
               Save All Settings
             </button>
           </div>

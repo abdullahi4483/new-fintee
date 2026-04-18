@@ -57,7 +57,8 @@ export function LandingPage() {
           </div>
           <div className="flex items-center gap-4">
             <Link
-              to="/admin"
+              to="/login"
+              state={{ from: "/admin" }}
               className="text-white/80 hover:text-[#c9a84c] transition-colors"
             >
               Admin

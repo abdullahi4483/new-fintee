@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Shield, Mail, Lock, User, Eye, EyeOff, Phone } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../lib/auth';
 
 export function Signup() {
   const [fullName, setFullName] = useState('');
@@ -12,21 +13,39 @@ export function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { signup } = useAuth();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setError('Passwords do not match.');
       return;
     }
     if (!agreedToTerms) {
-      alert('Please agree to the terms and conditions');
+      setError('Please agree to the terms and conditions.');
       return;
     }
-    // In a real app, this would create an account
-    navigate('/dashboard');
-  };
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+      await signup({ fullName, email, phone, password });
+      navigate('/login', {
+        replace: true,
+        state: {
+          signupSuccess: true,
+          email,
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to create your account right now.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#0f1420] to-[#0a0e1a] flex items-center justify-center p-6">
@@ -59,6 +78,12 @@ export function Signup() {
         {/* Signup Form */}
         <div className="p-8 rounded-2xl bg-gradient-to-br from-[#141e32]/80 to-[#0a0e1a]/80 backdrop-blur-xl border border-[#c9a84c]/20">
           <form onSubmit={handleSignup} className="space-y-4">
+            {error && (
+              <div className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-sm text-[#fca5a5]">
+                {error}
+              </div>
+            )}
+
             {/* Full Name */}
             <div>
               <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
@@ -186,9 +211,10 @@ export function Signup() {
             {/* Submit */}
             <button
               type="submit"
+              disabled={isSubmitting}
               className="w-full px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105"
             >
-              Create Account
+              {isSubmitting ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 

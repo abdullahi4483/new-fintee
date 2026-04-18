@@ -1,27 +1,47 @@
-import { Search, Filter, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Search, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { adminService, formatters } from '../../lib/services';
 
 export function AdminTransactions() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [transactions, setTransactions] = useState<Awaited<ReturnType<typeof adminService.getTransactions>>>([]);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const transactions = [
-    { id: 1, user: 'John Anderson', date: '2026-03-27 14:32', amount: 5000, type: 'Deposit', status: 'Completed' },
-    { id: 2, user: 'Sarah Williams', date: '2026-03-27 13:18', amount: -1200, type: 'Withdrawal', status: 'Completed' },
-    { id: 3, user: 'Mike Johnson', date: '2026-03-27 11:45', amount: -350, type: 'Transfer', status: 'Completed' },
-    { id: 4, user: 'Emily Davis', date: '2026-03-27 10:22', amount: 10000, type: 'Deposit', status: 'Completed' },
-    { id: 5, user: 'Tom Brown', date: '2026-03-27 09:15', amount: -500, type: 'Withdrawal', status: 'Pending' },
-    { id: 6, user: 'Lisa Garcia', date: '2026-03-26 18:40', amount: 2500, type: 'Deposit', status: 'Completed' },
-    { id: 7, user: 'David Martinez', date: '2026-03-26 16:55', amount: -750, type: 'Transfer', status: 'Completed' },
-    { id: 8, user: 'Jessica Wilson', date: '2026-03-26 14:20', amount: 8000, type: 'Deposit', status: 'Completed' },
-    { id: 9, user: 'John Anderson', date: '2026-03-26 12:10', amount: -200, type: 'Withdrawal', status: 'Completed' },
-    { id: 10, user: 'Sarah Williams', date: '2026-03-26 10:30', amount: -1500, type: 'Transfer', status: 'Failed' },
-  ];
+  useEffect(() => {
+    let active = true;
+
+    async function loadTransactions() {
+      try {
+        setIsLoading(true);
+        setError('');
+        const data = await adminService.getTransactions();
+        if (active) {
+          setTransactions(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Unable to load transactions.');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadTransactions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch = t.user.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = (t.user || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = filterType === 'all' || t.type.toLowerCase() === filterType.toLowerCase();
     const matchesStatus = filterStatus === 'all' || t.status.toLowerCase() === filterStatus.toLowerCase();
     return matchesSearch && matchesType && matchesStatus;
@@ -36,7 +56,12 @@ export function AdminTransactions() {
         <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Monitor all platform transactions</p>
       </div>
 
-      {/* Filters */}
+      {error && (
+        <div className="mb-6 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-[#fca5a5]">
+          {error}
+        </div>
+      )}
+
       <div className="mb-6 flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -57,6 +82,7 @@ export function AdminTransactions() {
           <option value="deposit">Deposit</option>
           <option value="withdrawal">Withdrawal</option>
           <option value="transfer">Transfer</option>
+          <option value="purchase">Purchase</option>
         </select>
         <select
           value={filterStatus}
@@ -70,7 +96,6 @@ export function AdminTransactions() {
         </select>
       </div>
 
-      {/* Transactions Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -101,7 +126,21 @@ export function AdminTransactions() {
               </tr>
             </thead>
             <tbody>
-              {filteredTransactions.map((transaction, index) => (
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    Loading transactions...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredTransactions.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    No transactions found.
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredTransactions.map((transaction, index) => (
                 <motion.tr
                   key={transaction.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -113,7 +152,7 @@ export function AdminTransactions() {
                     #{transaction.id.toString().padStart(5, '0')}
                   </td>
                   <td className="p-4" style={{ color: '#ffffff' }}>
-                    {transaction.user}
+                    {transaction.user || 'N/A'}
                   </td>
                   <td className="p-4" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                     {transaction.date}
@@ -141,7 +180,8 @@ export function AdminTransactions() {
                       color: transaction.amount > 0 ? '#10b981' : '#ef4444',
                     }}
                   >
-                    {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
+                    {transaction.amount > 0 ? '+' : '-'}
+                    {formatters.money(Math.abs(transaction.amount))}
                   </td>
                   <td className="p-4 text-center">
                     <span
@@ -149,8 +189,8 @@ export function AdminTransactions() {
                         transaction.status === 'Completed'
                           ? 'bg-[#10b981]/20 text-[#10b981]'
                           : transaction.status === 'Pending'
-                          ? 'bg-[#c9a84c]/20 text-[#c9a84c]'
-                          : 'bg-[#ef4444]/20 text-[#ef4444]'
+                            ? 'bg-[#c9a84c]/20 text-[#c9a84c]'
+                            : 'bg-[#ef4444]/20 text-[#ef4444]'
                       }`}
                       style={{ fontSize: '14px' }}
                     >

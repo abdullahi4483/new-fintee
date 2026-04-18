@@ -1,33 +1,80 @@
-import { Search, CheckCircle, XCircle } from 'lucide-react';
-import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Search, CheckCircle, XCircle, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { adminService } from '../../lib/services';
 
 export function Withdrawals() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [withdrawals, setWithdrawals] = useState<Awaited<ReturnType<typeof adminService.getWithdrawals>>>([]);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState('Verification failed');
 
-  const [withdrawals, setWithdrawals] = useState([
-    { id: 1, user: 'Tom Brown', email: 'tom@example.com', amount: 5000, date: '2026-03-27 14:30', status: 'Pending' },
-    { id: 2, user: 'Sarah Williams', email: 'sarah@example.com', amount: 3200, date: '2026-03-27 12:15', status: 'Pending' },
-    { id: 3, user: 'Mike Johnson', email: 'mike@example.com', amount: 1500, date: '2026-03-27 10:20', status: 'Pending' },
-    { id: 4, user: 'John Anderson', email: 'john@example.com', amount: 10000, date: '2026-03-26 16:45', status: 'Approved' },
-    { id: 5, user: 'Emily Davis', email: 'emily@example.com', amount: 2500, date: '2026-03-26 14:30', status: 'Approved' },
-    { id: 6, user: 'Lisa Garcia', email: 'lisa@example.com', amount: 8000, date: '2026-03-26 11:20', status: 'Rejected' },
-    { id: 7, user: 'David Martinez', email: 'david@example.com', amount: 500, date: '2026-03-25 18:10', status: 'Approved' },
-    { id: 8, user: 'Jessica Wilson', email: 'jessica@example.com', amount: 7500, date: '2026-03-25 15:30', status: 'Pending' },
-  ]);
+  useEffect(() => {
+    let active = true;
 
-  const handleApprove = (id: number) => {
-    setWithdrawals((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, status: 'Approved' } : w))
-    );
-  };
+    async function loadWithdrawals() {
+      try {
+        setIsLoading(true);
+        setError('');
+        const data = await adminService.getWithdrawals();
+        if (active) {
+          setWithdrawals(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Unable to load withdrawals.');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
 
-  const handleReject = (id: number) => {
-    setWithdrawals((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, status: 'Rejected' } : w))
-    );
-  };
+    void loadWithdrawals();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleApprove(id: string) {
+    try {
+      setSubmittingId(id);
+      setError('');
+      await adminService.approveWithdrawal(id);
+      setWithdrawals((prev) => prev.map((w) => (w.id === id ? { ...w, status: 'Approved' } : w)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to approve withdrawal.');
+    } finally {
+      setSubmittingId(null);
+    }
+  }
+
+  async function handleReject() {
+    if (!rejectTargetId || !rejectReason.trim()) {
+      return;
+    }
+
+    try {
+      setSubmittingId(rejectTargetId);
+      setError('');
+      await adminService.rejectWithdrawal(rejectTargetId, rejectReason.trim());
+      setWithdrawals((prev) =>
+        prev.map((w) => (w.id === rejectTargetId ? { ...w, status: 'Rejected' } : w)),
+      );
+      setRejectTargetId(null);
+      setRejectReason('Verification failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to reject withdrawal.');
+    } finally {
+      setSubmittingId(null);
+    }
+  }
 
   const filteredWithdrawals = withdrawals.filter((w) => {
     const matchesSearch =
@@ -46,7 +93,12 @@ export function Withdrawals() {
         <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Manage withdrawal requests</p>
       </div>
 
-      {/* Summary Stats */}
+      {error && (
+        <div className="mb-6 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-[#fca5a5]">
+          {error}
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-6 mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -85,15 +137,14 @@ export function Withdrawals() {
           className="p-6 rounded-xl bg-gradient-to-br from-[#141e32]/60 to-[#0a0e1a]/60 backdrop-blur-xl border border-[#c9a84c]/20"
         >
           <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }} className="mb-2">
-            Approved Today
+            Approved
           </div>
           <div className="font-heading" style={{ fontSize: '32px', color: '#10b981' }}>
-            {withdrawals.filter((w) => w.status === 'Approved' && w.date.startsWith('2026-03-27')).length}
+            {withdrawals.filter((w) => w.status === 'Approved').length}
           </div>
         </motion.div>
       </div>
 
-      {/* Filters */}
       <div className="mb-6 flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -117,7 +168,6 @@ export function Withdrawals() {
         </select>
       </div>
 
-      {/* Withdrawals Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -152,7 +202,21 @@ export function Withdrawals() {
               </tr>
             </thead>
             <tbody>
-              {filteredWithdrawals.map((withdrawal, index) => (
+              {isLoading && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    Loading withdrawals...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredWithdrawals.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    No withdrawals found.
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredWithdrawals.map((withdrawal, index) => (
                 <motion.tr
                   key={withdrawal.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -181,8 +245,8 @@ export function Withdrawals() {
                         withdrawal.status === 'Pending'
                           ? 'bg-[#c9a84c]/20 text-[#c9a84c]'
                           : withdrawal.status === 'Approved'
-                          ? 'bg-[#10b981]/20 text-[#10b981]'
-                          : 'bg-[#ef4444]/20 text-[#ef4444]'
+                            ? 'bg-[#10b981]/20 text-[#10b981]'
+                            : 'bg-[#ef4444]/20 text-[#ef4444]'
                       }`}
                       style={{ fontSize: '14px' }}
                     >
@@ -191,25 +255,29 @@ export function Withdrawals() {
                   </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2">
-                      {withdrawal.status === 'Pending' && (
+                      {withdrawal.status === 'Pending' ? (
                         <>
                           <button
-                            onClick={() => handleApprove(withdrawal.id)}
+                            onClick={() => void handleApprove(withdrawal.id)}
+                            disabled={submittingId === withdrawal.id}
                             className="p-2 rounded bg-[#10b981]/20 hover:bg-[#10b981]/30 transition-all"
                             title="Approve"
                           >
                             <CheckCircle className="w-4 h-4 text-[#10b981]" />
                           </button>
                           <button
-                            onClick={() => handleReject(withdrawal.id)}
+                            onClick={() => {
+                              setRejectTargetId(withdrawal.id);
+                              setRejectReason('Verification failed');
+                            }}
+                            disabled={submittingId === withdrawal.id}
                             className="p-2 rounded bg-[#ef4444]/20 hover:bg-[#ef4444]/30 transition-all"
                             title="Reject"
                           >
                             <XCircle className="w-4 h-4 text-[#ef4444]" />
                           </button>
                         </>
-                      )}
-                      {withdrawal.status !== 'Pending' && (
+                      ) : (
                         <span style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)' }}>-</span>
                       )}
                     </div>
@@ -220,6 +288,69 @@ export function Withdrawals() {
           </table>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {rejectTargetId && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={() => setRejectTargetId(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 12 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-lg rounded-2xl border border-[#c9a84c]/20 bg-gradient-to-br from-[#141e32] to-[#0a0e1a] p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="font-heading" style={{ fontSize: '24px', color: '#ffffff' }}>
+                  Reject Withdrawal
+                </h2>
+                <button
+                  onClick={() => setRejectTargetId(null)}
+                  className="rounded-lg p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label="Close modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <label className="mb-2 block text-sm" style={{ color: 'rgba(255, 255, 255, 0.75)' }}>
+                Rejection Reason
+              </label>
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-[#c9a84c]/20 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 focus:border-[#c9a84c] focus:outline-none"
+                placeholder="Add a reason for rejecting this withdrawal"
+              />
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRejectTargetId(null)}
+                  className="rounded-lg border border-white/15 px-4 py-2 text-white/80 transition-colors hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!rejectReason.trim() || submittingId === rejectTargetId}
+                  onClick={() => void handleReject()}
+                  className="rounded-lg bg-[#ef4444] px-5 py-2 font-medium text-white transition-colors hover:bg-[#dc2626] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submittingId === rejectTargetId ? 'Rejecting...' : 'Confirm Reject'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

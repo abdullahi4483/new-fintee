@@ -1,11 +1,31 @@
 import { Outlet, Link, useLocation } from 'react-router';
 import { LayoutDashboard, Users, CreditCard, DollarSign, Settings, LogOut, Menu, X, Shield, MessageCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../lib/auth';
 
 export function AdminLayout() {
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 768px)').matches);
+  const { logout, session } = useAuth();
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setIsDesktop(event.matches);
+      if (event.matches) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    setIsDesktop(mediaQuery.matches);
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
 
   const navItems = [
     { path: '/admin', label: 'Overview', icon: LayoutDashboard },
@@ -28,7 +48,7 @@ export function AdminLayout() {
 
       {/* Sidebar */}
       <AnimatePresence>
-        {(isSidebarOpen || window.innerWidth >= 768) && (
+        {(isSidebarOpen || isDesktop) && (
           <motion.aside
             initial={{ x: -300 }}
             animate={{ x: 0 }}
@@ -47,6 +67,11 @@ export function AdminLayout() {
                   Back Office
                 </div>
               </div>
+            </div>
+
+            <div className="mb-8 rounded-xl bg-white/5 p-4">
+              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.5)' }}>Administrator</div>
+              <div style={{ color: '#ffffff' }}>{session?.user?.fullName || session?.user?.email || 'Admin User'}</div>
             </div>
 
             <nav className="space-y-2 mb-8">
@@ -71,13 +96,14 @@ export function AdminLayout() {
             </nav>
 
             <div className="absolute bottom-6 left-6 right-6">
-              <Link
-                to="/login"
+              <button
+                type="button"
+                onClick={() => void logout()}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/70 hover:bg-white/5 hover:text-white transition-all"
               >
                 <LogOut className="w-5 h-5" />
                 <span>Logout</span>
-              </Link>
+              </button>
             </div>
           </motion.aside>
         )}

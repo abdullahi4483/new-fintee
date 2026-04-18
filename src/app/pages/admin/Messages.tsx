@@ -1,80 +1,71 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Filter, MessageCircle, Mail, Clock, CheckCircle, X } from 'lucide-react';
 import { motion } from 'motion/react';
+import { adminService } from '../../lib/services';
 
 export function Messages() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [selectedMessage, setSelectedMessage] = useState<number | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [replyBody, setReplyBody] = useState('');
+  const [messages, setMessages] = useState<Awaited<ReturnType<typeof adminService.getMessages>>>([]);
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const messages = [
-    {
-      id: 1,
-      user: 'John Anderson',
-      email: 'john@example.com',
-      category: 'Withdrawal Request',
-      subject: 'Urgent withdrawal verification needed',
-      message: 'I submitted a withdrawal request for $5,000 3 days ago and need it processed urgently. Can you help expedite this?',
-      status: 'Pending',
-      date: '2026-03-27',
-      time: '10:30 AM',
-    },
-    {
-      id: 2,
-      user: 'Sarah Williams',
-      email: 'sarah@example.com',
-      category: 'Account Issue',
-      subject: 'Cannot access my account',
-      message: 'I\'ve been locked out of my account after multiple failed login attempts. Please help me regain access.',
-      status: 'Pending',
-      date: '2026-03-27',
-      time: '09:15 AM',
-    },
-    {
-      id: 3,
-      user: 'Mike Johnson',
-      email: 'mike@example.com',
-      category: 'Transaction Problem',
-      subject: 'Transaction not reflecting in my account',
-      message: 'I made a deposit of $2,000 yesterday but it\'s still not showing in my account balance. Transaction ID: TXN123456',
-      status: 'Replied',
-      date: '2026-03-26',
-      time: '04:20 PM',
-    },
-    {
-      id: 4,
-      user: 'Emily Davis',
-      email: 'emily@example.com',
-      category: 'Technical Support',
-      subject: 'Mobile app crashes on login',
-      message: 'The mobile app keeps crashing whenever I try to log in. I\'m using an iPhone 14 with the latest iOS version.',
-      status: 'Resolved',
-      date: '2026-03-26',
-      time: '02:45 PM',
-    },
-    {
-      id: 5,
-      user: 'Tom Brown',
-      email: 'tom@example.com',
-      category: 'General Inquiry',
-      subject: 'Question about account limits',
-      message: 'What are the daily transaction limits for premium accounts? I need to make a large transfer next week.',
-      status: 'Replied',
-      date: '2026-03-25',
-      time: '11:30 AM',
-    },
-    {
-      id: 6,
-      user: 'Lisa Garcia',
-      email: 'lisa@example.com',
-      category: 'Withdrawal Request',
-      subject: 'Withdrawal documentation required',
-      message: 'I need to withdraw $15,000 for an emergency. What documentation do you need from me?',
-      status: 'Pending',
-      date: '2026-03-25',
-      time: '09:00 AM',
-    },
-  ];
+  useEffect(() => {
+    let active = true;
+
+    async function loadMessages() {
+      try {
+        setIsLoading(true);
+        setError('');
+        const data = await adminService.getMessages();
+        if (active) {
+          setMessages(data);
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Unable to load messages.');
+        }
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadMessages();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function replyToSelected(messageId: string) {
+    if (!replyBody.trim()) {
+      setError('Reply message cannot be empty.');
+      return;
+    }
+
+    try {
+      setError('');
+      await adminService.replyToMessage(messageId, replyBody.trim());
+      setMessages((current) => current.map((msg) => (msg.id === messageId ? { ...msg, status: 'Replied' } : msg)));
+      setReplyBody('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to reply to message.');
+    }
+  }
+
+  async function resolveSelected(messageId: string) {
+    try {
+      setError('');
+      await adminService.resolveMessage(messageId);
+      setMessages((current) => current.map((msg) => (msg.id === messageId ? { ...msg, status: 'Resolved' } : msg)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to resolve message.');
+    }
+  }
 
   const filteredMessages = messages.filter((msg) => {
     const matchesSearch =
@@ -101,7 +92,12 @@ export function Messages() {
         <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>View and respond to customer inquiries</p>
       </div>
 
-      {/* Stats Cards */}
+      {error && (
+        <div className="mb-6 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-[#fca5a5]">
+          {error}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -163,7 +159,6 @@ export function Messages() {
         </motion.div>
       </div>
 
-      {/* Filters */}
       <div className="mb-6 flex flex-col md:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
@@ -190,7 +185,6 @@ export function Messages() {
         </div>
       </div>
 
-      {/* Messages Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -221,7 +215,21 @@ export function Messages() {
               </tr>
             </thead>
             <tbody>
-              {filteredMessages.map((msg, index) => (
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    Loading messages...
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredMessages.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="p-6 text-center" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    No messages found.
+                  </td>
+                </tr>
+              )}
+              {!isLoading && filteredMessages.map((msg, index) => (
                 <motion.tr
                   key={msg.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -247,8 +255,8 @@ export function Messages() {
                         msg.status === 'Pending'
                           ? 'bg-[#c9a84c]/20 text-[#c9a84c]'
                           : msg.status === 'Replied'
-                          ? 'bg-[#3b82f6]/20 text-[#3b82f6]'
-                          : 'bg-[#10b981]/20 text-[#10b981]'
+                            ? 'bg-[#3b82f6]/20 text-[#3b82f6]'
+                            : 'bg-[#10b981]/20 text-[#10b981]'
                       }`}
                       style={{ fontSize: '14px' }}
                     >
@@ -257,17 +265,25 @@ export function Messages() {
                   </td>
                   <td className="p-4 text-center">
                     <div style={{ color: '#ffffff' }}>{msg.date}</div>
-                    <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)' }}>{msg.time}</div>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2">
                       <button
-                        onClick={() => setSelectedMessage(msg.id)}
+                        onClick={() => {
+                          setSelectedMessage(msg.id);
+                          setReplyBody('');
+                        }}
                         className="px-3 py-1 rounded bg-[#3b82f6]/20 text-[#3b82f6] hover:bg-[#3b82f6]/30 transition-all text-sm"
                       >
                         View
                       </button>
-                      <button className="px-3 py-1 rounded bg-[#c9a84c]/20 text-[#c9a84c] hover:bg-[#c9a84c]/30 transition-all text-sm">
+                      <button
+                        onClick={() => {
+                          setSelectedMessage(msg.id);
+                          setReplyBody('');
+                        }}
+                        className="px-3 py-1 rounded bg-[#c9a84c]/20 text-[#c9a84c] hover:bg-[#c9a84c]/30 transition-all text-sm"
+                      >
                         Reply
                       </button>
                     </div>
@@ -279,7 +295,6 @@ export function Messages() {
         </div>
       </motion.div>
 
-      {/* Message Detail Modal */}
       {selectedMessage && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
@@ -299,7 +314,7 @@ export function Messages() {
             </button>
 
             {(() => {
-              const msg = messages.find((m) => m.id === selectedMessage);
+              const msg = messages.find((message) => message.id === selectedMessage);
               if (!msg) return null;
 
               return (
@@ -314,7 +329,7 @@ export function Messages() {
                       <span>{msg.email}</span>
                     </div>
                     <div className="flex items-center gap-4 mt-2" style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-                      <span>{msg.date} at {msg.time}</span>
+                      <span>{msg.date}</span>
                       <span className="px-2 py-1 rounded bg-[#c9a84c]/20 text-[#c9a84c] text-sm">{msg.category}</span>
                     </div>
                   </div>
@@ -325,15 +340,17 @@ export function Messages() {
 
                   <div className="space-y-3">
                     <textarea
+                      value={replyBody}
+                      onChange={(event) => setReplyBody(event.target.value)}
                       placeholder="Type your reply here..."
                       rows={4}
                       className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white placeholder:text-white/40 focus:border-[#c9a84c] focus:outline-none transition-all resize-none"
                     />
                     <div className="flex gap-3">
-                      <button className="flex-1 px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105">
+                      <button onClick={() => void replyToSelected(msg.id)} className="flex-1 px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105">
                         Send Reply
                       </button>
-                      <button className="px-6 py-3 border border-[#10b981]/40 text-[#10b981] rounded-lg hover:border-[#10b981] transition-all">
+                      <button onClick={() => void resolveSelected(msg.id)} className="px-6 py-3 border border-[#10b981]/40 text-[#10b981] rounded-lg hover:border-[#10b981] transition-all">
                         Mark Resolved
                       </button>
                     </div>

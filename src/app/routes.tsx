@@ -3,12 +3,12 @@ import { LandingPage } from "./pages/LandingPage";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
 import { DashboardLayout } from "./layouts/DashboardLayout";
-import { DashboardOverview } from "./pages/dashboard/DashboardOverview";
-import { Accounts } from "./pages/dashboard/Accounts";
-import { Transactions } from "./pages/dashboard/Transactions";
-import { Cards } from "./pages/dashboard/Cards";
-import { Support } from "./pages/dashboard/Support";
-import { Settings } from "./pages/dashboard/Settings";
+import { DashboardOverview } from "./pages/client/DashboardOverview";
+import { Accounts } from "./pages/client/Accounts";
+import { Transactions } from "./pages/client/Transactions";
+import { Cards } from "./pages/client/Cards";
+import { Support } from "./pages/client/Support";
+import { Settings } from "./pages/client/Settings";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { AdminOverview } from "./pages/admin/AdminOverview";
 import { Users } from "./pages/admin/Users";
@@ -16,6 +16,7 @@ import { AdminTransactions } from "./pages/admin/AdminTransactions";
 import { Withdrawals } from "./pages/admin/Withdrawals";
 import { Messages } from "./pages/admin/Messages";
 import { AdminSettings } from "./pages/admin/AdminSettings";
+import { GuestOnly, RequireAuth } from "./lib/auth";
 
 export const router = createBrowserRouter([
   {
@@ -24,15 +25,27 @@ export const router = createBrowserRouter([
   },
   {
     path: "/login",
-    Component: Login,
+    Component: () => (
+      <GuestOnly>
+        <Login />
+      </GuestOnly>
+    ),
   },
   {
     path: "/signup",
-    Component: Signup,
+    Component: () => (
+      <GuestOnly>
+        <Signup />
+      </GuestOnly>
+    ),
   },
   {
     path: "/dashboard",
-    Component: DashboardLayout,
+    Component: () => (
+      <RequireAuth role="client">
+        <DashboardLayout />
+      </RequireAuth>
+    ),
     children: [
       { index: true, Component: DashboardOverview },
       { path: "accounts", Component: Accounts },
@@ -44,7 +57,11 @@ export const router = createBrowserRouter([
   },
   {
     path: "/admin",
-    Component: AdminLayout,
+    Component: () => (
+      <RequireAuth role="admin">
+        <AdminLayout />
+      </RequireAuth>
+    ),
     children: [
       { index: true, Component: AdminOverview },
       { path: "users", Component: Users },

@@ -1,24 +1,49 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useAuth } from '../lib/auth';
 
 export function Login() {
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const redirectTo = typeof location.state?.from === 'string' ? location.state.from : null;
+  const signupEmail = typeof location.state?.email === 'string' ? location.state.email : '';
+  const signupSuccess = Boolean(location.state?.signupSuccess);
+  const defaultUserType: 'client' | 'admin' = redirectTo?.startsWith('/admin') ? 'admin' : 'client';
+  const [email, setEmail] = useState(signupEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [userType, setUserType] = useState<'client' | 'admin'>('client');
+  const [userType, setUserType] = useState<'client' | 'admin'>(defaultUserType);
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    setUserType(defaultUserType);
+  }, [defaultUserType]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would validate credentials
-    if (userType === 'admin') {
-      navigate('/admin');
-    } else {
-      navigate('/dashboard');
+
+    try {
+      setIsSubmitting(true);
+      setError('');
+      const session = await login({ email, password, roleHint: userType });
+      const fallbackPath = session.role === 'admin' ? '/admin' : '/dashboard';
+      const nextPath =
+        redirectTo &&
+        ((session.role === 'admin' && redirectTo.startsWith('/admin')) ||
+          (session.role === 'client' && redirectTo.startsWith('/dashboard')))
+          ? redirectTo
+          : fallbackPath;
+      navigate(nextPath, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to sign in right now.');
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0e1a] via-[#0f1420] to-[#0a0e1a] flex items-center justify-center p-6">
@@ -43,14 +68,22 @@ export function Login() {
             </span>
           </Link>
           <h1 className="font-heading mb-2" style={{ fontSize: '32px', color: '#ffffff' }}>
-            Welcome Back
+            {userType === 'admin' ? 'Admin Sign In' : 'Welcome Back'}
           </h1>
-          <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Sign in to your account</p>
+          <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
+            {userType === 'admin' ? 'Sign in to the admin portal' : 'Sign in to your account'}
+          </p>
         </div>
 
         {/* Login Form */}
         <div className="p-8 rounded-2xl bg-gradient-to-br from-[#141e32]/80 to-[#0a0e1a]/80 backdrop-blur-xl border border-[#c9a84c]/20">
           {/* User Type Toggle */}
+          {signupSuccess && (
+            <div className="mb-4 rounded-lg border border-[#10b981]/30 bg-[#10b981]/10 px-4 py-3 text-sm text-[#86efac]">
+              Account created successfully. Sign in to continue.
+            </div>
+          )}
+
           <div className="flex gap-2 mb-6 p-1 rounded-lg bg-white/5">
             <button
               type="button"
@@ -77,6 +110,12 @@ export function Login() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {error && (
+              <div className="rounded-lg border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-sm text-[#fca5a5]">
+                {error}
+              </div>
+            )}
+
             {/* Email */}
             <div>
               <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
@@ -136,9 +175,10 @@ export function Login() {
             {/* Submit */}
             <button
               type="submit"
+              disabled={isSubmitting}
               className="w-full px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105"
             >
-              Sign In
+              {isSubmitting ? 'Signing In...' : userType === 'admin' ? 'Sign In as Admin' : 'Sign In'}
             </button>
           </form>
 
