@@ -14,8 +14,8 @@ interface WithdrawModalProps {
     requestType: 'WITHDRAWAL' | 'TRANSFER';
     accountId: string;
     amount: string;
-    currency: string;
-    note: string;
+    accountNumber: string;
+    bankCode: string;
   }) => void | Promise<void>;
 }
 
@@ -23,8 +23,8 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
   const [requestType, setRequestType] = useState<'WITHDRAWAL' | 'TRANSFER'>('WITHDRAWAL');
   const [accountId, setAccountId] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('USD');
-  const [note, setNote] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [bankCode, setBankCode] = useState('');
 
   useEffect(() => {
     if (!isOpen || accounts.length === 0) {
@@ -33,7 +33,7 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
 
     const initialAccount = accounts[0];
     setAccountId(initialAccount.id);
-    setCurrency(initialAccount.currency);
+    setAccountNumber(initialAccount.accountNumber || '');
   }, [accounts, isOpen]);
 
   const selectedAccount = accounts.find((account) => account.id === accountId) || accounts[0];
@@ -99,7 +99,13 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
                     className="space-y-4"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      void onSubmit({ requestType, accountId, amount, currency, note });
+                      void onSubmit({
+                        requestType,
+                        accountId,
+                        amount,
+                        accountNumber,
+                        bankCode,
+                      });
                     }}
                   >
                     {error && (
@@ -135,7 +141,7 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
                         onChange={(event) => {
                           const nextAccount = accounts.find((account) => account.id === event.target.value);
                           setAccountId(event.target.value);
-                          setCurrency(nextAccount?.currency || 'USD');
+                          setAccountNumber(nextAccount?.accountNumber || '');
                         }}
                         className="w-full rounded-lg bg-white/5 px-4 py-3 text-white border border-[#c9a84c]/20 focus:border-[#c9a84c] focus:outline-none"
                       >
@@ -145,6 +151,32 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-left" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                        Destination Account Number
+                      </label>
+                      <input
+                        type="text"
+                        value={accountNumber}
+                        onChange={(event) => setAccountNumber(event.target.value)}
+                        placeholder="0123456789"
+                        className="w-full rounded-lg bg-white/5 px-4 py-3 text-white border border-[#c9a84c]/20 placeholder:text-white/30 focus:border-[#c9a84c] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-left" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                        Bank Code
+                      </label>
+                      <input
+                        type="text"
+                        value={bankCode}
+                        onChange={(event) => setBankCode(event.target.value)}
+                        placeholder="058"
+                        className="w-full rounded-lg bg-white/5 px-4 py-3 text-white border border-[#c9a84c]/20 placeholder:text-white/30 focus:border-[#c9a84c] focus:outline-none"
+                      />
                     </div>
 
                     <div>
@@ -169,22 +201,9 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
                       </div>
                     </div>
 
-                    <div>
-                      <label className="mb-2 block text-left" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                        Message for Support
-                      </label>
-                      <textarea
-                        rows={4}
-                        value={note}
-                        onChange={(event) => setNote(event.target.value)}
-                        placeholder="Tell customer support why you need this withdrawal or transfer verified."
-                        className="w-full rounded-lg bg-white/5 px-4 py-3 text-white border border-[#c9a84c]/20 placeholder:text-white/30 focus:border-[#c9a84c] focus:outline-none resize-none"
-                      />
-                    </div>
-
                     <div className="rounded-lg border border-[#c9a84c]/20 bg-[#c9a84c]/10 px-4 py-3 text-left">
                       <div style={{ color: '#ffffff', fontSize: '14px' }}>
-                        Customer support will review this {requestType === 'TRANSFER' ? 'transfer' : 'withdrawal'} request for verification before processing.
+                        This request will be sent to the live withdrawals endpoint for processing.
                       </div>
                     </div>
 
@@ -193,7 +212,7 @@ export function WithdrawModal({ isOpen, onClose, accounts, onSubmit, isSubmittin
                       disabled={isSubmitting}
                       className="w-full px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105"
                     >
-                      {isSubmitting ? 'Sending...' : 'Contact Customer Support'}
+                      {isSubmitting ? 'Submitting...' : 'Submit Withdrawal'}
                     </button>
 
                     <button

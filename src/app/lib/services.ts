@@ -1,4 +1,5 @@
 import {
+  ApiError,
   apiRequest,
   formatApiDate,
   loadSession,
@@ -65,21 +66,6 @@ export interface SupportMessageRecord {
 export interface ProfileSettings {
   fullName: string;
   email: string;
-  phone: string;
-}
-
-export interface SecuritySettings {
-  twoFactorEnabled: boolean;
-}
-
-export interface NotificationSettings {
-  emailNotifications: boolean;
-  pushNotifications: boolean;
-}
-
-export interface PreferenceSettings {
-  language: string;
-  currency: string;
 }
 
 export interface AdminSettingsRecord {
@@ -255,10 +241,8 @@ function applyClientBalanceOverrideToAccounts(accounts: AccountRecord[]) {
 
 export const authService = {
   changePassword(input: { currentPassword: string; newPassword: string }) {
-    return apiRequest("/auth/change-password", {
-      method: "POST",
-      body: input,
-    });
+    void input;
+    throw new ApiError("Password updates are not exposed by the current API.", 400, null);
   },
 };
 
@@ -306,19 +290,14 @@ export const customerService = {
   freezeCard(cardId: string) {
     return apiRequest(`/cards/${cardId}/freeze`, { method: "PATCH" });
   },
-  unfreezeCard(cardId: string) {
-    return apiRequest(`/cards/${cardId}/unfreeze`, { method: "PATCH" });
-  },
-  replaceCard(cardId: string, reason: string) {
-    return apiRequest(`/cards/${cardId}/replace`, {
-      method: "POST",
-      body: { reason },
-    });
-  },
-  createWithdrawal(input: { accountId: string; amount: string; currency: string }) {
+  createWithdrawal(input: { amount: string; accountNumber: string; bankCode: string }) {
     return apiRequest("/withdrawals", {
       method: "POST",
-      body: input,
+      body: {
+        amount: Number(input.amount),
+        accountNumber: input.accountNumber,
+        bankCode: input.bankCode,
+      },
     });
   },
   async getWithdrawals() {
@@ -336,104 +315,75 @@ export const customerService = {
     const payload = await apiRequest("/support/messages?page=1&pageSize=20");
     return pickArray<Record<string, unknown>>(payload, ["messages"]).map(mapSupportMessage);
   },
-  sendSupportMessage(input: { category: string; subject: string; message: string }) {
+  sendSupportMessage(input: { subject: string; message: string }) {
     return apiRequest("/support/messages", {
       method: "POST",
-      body: input,
+      body: {
+        subject: input.subject,
+        message: input.message,
+      },
     });
   },
   async getProfile() {
-    const payload = await apiRequest("/settings/profile");
-    const profile = pickObject<Record<string, unknown>>(payload, ["profile"]);
+    const session = loadSession();
     return {
-      fullName: readString(profile.fullName ?? profile.name),
-      email: readString(profile.email),
-      phone: readString(profile.phone),
+      fullName: readString(session?.user?.fullName),
+      email: readString(session?.user?.email),
     } satisfies ProfileSettings;
   },
   updateProfile(input: ProfileSettings) {
     return apiRequest("/settings/profile", {
       method: "PATCH",
-      body: input,
-    });
-  },
-  async getSecurity() {
-    const payload = await apiRequest("/settings/security");
-    const security = pickObject<Record<string, unknown>>(payload, ["security"]);
-    return {
-      twoFactorEnabled: Boolean(security.twoFactorEnabled),
-    } satisfies SecuritySettings;
-  },
-  updateSecurity(input: SecuritySettings) {
-    return apiRequest("/settings/security", {
-      method: "PATCH",
-      body: input,
-    });
-  },
-  async getNotifications() {
-    const payload = await apiRequest("/settings/notifications");
-    const notifications = pickObject<Record<string, unknown>>(payload, ["notifications"]);
-    return {
-      emailNotifications: Boolean(notifications.emailNotifications),
-      pushNotifications: Boolean(notifications.pushNotifications),
-    } satisfies NotificationSettings;
-  },
-  updateNotifications(input: NotificationSettings) {
-    return apiRequest("/settings/notifications", {
-      method: "PATCH",
-      body: input,
-    });
-  },
-  async getPreferences() {
-    const payload = await apiRequest("/settings/preferences");
-    const preferences = pickObject<Record<string, unknown>>(payload, ["preferences"]);
-    return {
-      language: readString(preferences.language, "en"),
-      currency: toCurrency(preferences.currency),
-    } satisfies PreferenceSettings;
-  },
-  updatePreferences(input: PreferenceSettings) {
-    return apiRequest("/settings/preferences", {
-      method: "PATCH",
-      body: input,
+      body: {
+        fullName: input.fullName,
+        email: input.email,
+      },
     });
   },
 };
 
 export const adminService = {
   async getDashboardSummary() {
-    const payload = await apiRequest("/admin/dashboard/summary");
-    const summary = pickObject<Record<string, unknown>>(payload, ["summary", "dashboard"]);
-    const stats = pickArray<Record<string, unknown>>(payload, ["stats"]);
-    const activity = pickArray<Record<string, unknown>>(payload, [
-      "recentActivity",
-      "activities",
-      "recentEvents",
+    const [users, withdrawals, messages] = await Promise.all([
+      this.getUsers(),
+      this.getWithdrawals(),
+      this.getMessages().catch(() => []),
     ]);
 
-    const metrics =
-      stats.length > 0
-        ? stats.map((raw, index) => ({
-            label: readString(raw.label, `Metric ${index + 1}`),
-            value: readString(raw.value, "0"),
-            change: readString(raw.change),
-          }))
-        : [
-            { label: "Total Users", value: String(summary.totalUsers ?? 0), change: readString(summary.usersChange) },
-            { label: "Total Deposits", value: String(summary.totalDeposits ?? 0), change: readString(summary.depositsChange) },
-            { label: "Pending Withdrawals", value: String(summary.pendingWithdrawals ?? 0), change: readString(summary.withdrawalsChange) },
-            { label: "Revenue", value: String(summary.revenue ?? 0), change: readString(summary.revenueChange) },
-          ];
+    const pendingWithdrawals = withdrawals.filter((item) => item.status === "Pending");
+    const metrics = [
+      { label: "Total Users", value: String(users.length), change: "" },
+      { label: "Support Tickets", value: String(messages.length), change: "" },
+      { label: "Pending Withdrawals", value: String(pendingWithdrawals.length), change: "" },
+      {
+        label: "Pending Amount",
+        value: toMoney(
+          pendingWithdrawals.reduce((sum, item) => sum + item.amount, 0),
+        ),
+        change: "",
+      },
+    ];
+
+    const activity = [
+      ...withdrawals.slice(0, 5).map((item) => ({
+        id: `withdrawal-${item.id}`,
+        user: item.user,
+        action: `Withdrawal ${item.status.toLowerCase()}`,
+        amount: toMoney(item.amount),
+        time: item.date,
+      })),
+      ...messages.slice(0, 5).map((item) => ({
+        id: `message-${item.id}`,
+        user: item.user,
+        action: item.subject,
+        amount: item.status,
+        time: item.date,
+      })),
+    ].slice(0, 6);
 
     return {
       metrics,
-      recentActivity: activity.map((raw, index) => ({
-        id: readString(raw.id ?? raw._id, `activity-${index + 1}`),
-        user: readString(raw.userName ?? (raw.user as Record<string, unknown> | undefined)?.fullName, "User"),
-        action: readString(raw.action ?? raw.description, "Activity"),
-        amount: readString(raw.amount, "-"),
-        time: formatApiDate(raw.createdAt ?? raw.date),
-      })),
+      recentActivity: activity,
     };
   },
   async getUsers() {
@@ -449,31 +399,16 @@ export const adminService = {
     })) as AdminUserRecord[];
   },
   async getUserById(userId: string) {
-    const payload = await apiRequest(`/admin/users/${userId}`);
-    const raw = pickObject<Record<string, unknown>>(payload, ["user", "profile"]);
-    return {
-      id: readString(raw.id ?? raw._id ?? raw.userId, userId),
-      name: readString(raw.fullName ?? raw.name, "User"),
-      email: readString(raw.email),
-      phone: readString(raw.phone),
-      balance: readNumber(raw.balance ?? raw.totalBalance),
-      status: upper(raw.status, "Unknown"),
-      joined: formatApiDate(raw.createdAt ?? raw.joinedAt),
-    } as AdminUserRecord;
+    const users = await this.getUsers();
+    return users.find((user) => user.id === userId) ?? null;
   },
   updateUser(
     userId: string,
     input: { fullName: string; email: string; phone: string; amount: string },
   ) {
-    return apiRequest(`/admin/users/${userId}`, {
-      method: "PATCH",
-      body: {
-        fullName: input.fullName,
-        email: input.email,
-        phone: input.phone,
-        amount: input.amount,
-      },
-    });
+    void userId;
+    void input;
+    throw new ApiError("User profile edits are not exposed by the current admin API.", 400, null);
   },
   updateUserStatus(userId: string, status: string) {
     return apiRequest(`/admin/users/${userId}/status`, {
@@ -488,13 +423,19 @@ export const adminService = {
     password: string;
     balance: string;
   }) {
-    return apiRequest("/admin/users", {
+    const names = input.fullName.trim().split(/\s+/).filter(Boolean);
+    return apiRequest("/auth/signup", {
       method: "POST",
-      body: input,
+      auth: false,
+      body: {
+        email: input.email,
+        password: input.password,
+        fullName: names.join(" ") || input.fullName.trim(),
+      },
     });
   },
   async getTransactions() {
-    const payload = await apiRequest("/admin/transactions?page=1&pageSize=20");
+    const payload = await apiRequest("/transactions?page=1&pageSize=50");
     return pickArray<Record<string, unknown>>(payload, ["transactions"]).map(mapTransaction);
   },
   async getWithdrawals() {
@@ -524,22 +465,15 @@ export const adminService = {
   replyToMessage(messageId: string, body: string) {
     return apiRequest(`/admin/messages/${messageId}/reply`, {
       method: "POST",
-      body: { body },
+      body: { message: body },
     });
-  },
-  resolveMessage(messageId: string) {
-    return apiRequest(`/admin/messages/${messageId}/resolve`, { method: "PATCH" });
   },
   async getSettings() {
-    const payload = await apiRequest("/admin/settings");
-    const settings = pickObject<Record<string, unknown>>(payload, ["settings"]);
-    return mapAdminSettings(settings);
+    return mapAdminSettings({});
   },
   updateSettings(input: AdminSettingsRecord) {
-    return apiRequest("/admin/settings", {
-      method: "PATCH",
-      body: input,
-    });
+    void input;
+    throw new ApiError("Admin settings are not exposed by the current API.", 400, null);
   },
 };
 

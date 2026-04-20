@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Shield, Mail, Lock, User, Eye, EyeOff, Phone } from 'lucide-react';
+import { Shield, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/auth';
 
 export function Signup() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +31,7 @@ export function Signup() {
     try {
       setIsSubmitting(true);
       setError('');
-      await signup({ fullName, email, phone, password });
+      await signup({ fullName, email, phone: '', password });
       navigate('/login', {
         replace: true,
         state: {
@@ -84,7 +83,6 @@ export function Signup() {
               </div>
             )}
 
-            {/* Full Name */}
             <div>
               <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                 Full Name
@@ -114,24 +112,6 @@ export function Signup() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  required
-                  className="w-full pl-12 pr-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white placeholder:text-white/40 focus:border-[#c9a84c] focus:outline-none transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                Phone Number
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter your phone number"
                   required
                   className="w-full pl-12 pr-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white placeholder:text-white/40 focus:border-[#c9a84c] focus:outline-none transition-all"
                 />

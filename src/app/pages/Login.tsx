@@ -4,12 +4,13 @@ import { Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/auth';
 
-export function Login() {
+export function Login({ portal = 'shared' }: { portal?: 'shared' | 'client' | 'admin' }) {
   const location = useLocation();
   const redirectTo = typeof location.state?.from === 'string' ? location.state.from : null;
   const signupEmail = typeof location.state?.email === 'string' ? location.state.email : '';
   const signupSuccess = Boolean(location.state?.signupSuccess);
-  const defaultUserType: 'client' | 'admin' = redirectTo?.startsWith('/admin') ? 'admin' : 'client';
+  const defaultUserType: 'client' | 'admin' =
+    portal === 'admin' ? 'admin' : portal === 'client' ? 'client' : redirectTo?.startsWith('/admin') ? 'admin' : 'client';
   const [email, setEmail] = useState(signupEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -71,7 +72,7 @@ export function Login() {
             {userType === 'admin' ? 'Admin Sign In' : 'Welcome Back'}
           </h1>
           <p style={{ color: 'rgba(255, 255, 255, 0.6)' }}>
-            {userType === 'admin' ? 'Sign in to the admin portal' : 'Sign in to your account'}
+            {userType === 'admin' ? 'Sign in to your personal admin portal' : 'Sign in to your account'}
           </p>
         </div>
 
@@ -84,30 +85,32 @@ export function Login() {
             </div>
           )}
 
-          <div className="flex gap-2 mb-6 p-1 rounded-lg bg-white/5">
-            <button
-              type="button"
-              onClick={() => setUserType('client')}
-              className={`flex-1 py-2 rounded-md transition-all ${
-                userType === 'client'
-                  ? 'bg-[#c9a84c] text-[#0a0e1a]'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Client
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserType('admin')}
-              className={`flex-1 py-2 rounded-md transition-all ${
-                userType === 'admin'
-                  ? 'bg-[#c9a84c] text-[#0a0e1a]'
-                  : 'text-white/60 hover:text-white'
-              }`}
-            >
-              Admin
-            </button>
-          </div>
+          {portal === 'shared' && (
+            <div className="flex gap-2 mb-6 p-1 rounded-lg bg-white/5">
+              <button
+                type="button"
+                onClick={() => setUserType('client')}
+                className={`flex-1 py-2 rounded-md transition-all ${
+                  userType === 'client'
+                    ? 'bg-[#c9a84c] text-[#0a0e1a]'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Client
+              </button>
+              <button
+                type="button"
+                onClick={() => setUserType('admin')}
+                className={`flex-1 py-2 rounded-md transition-all ${
+                  userType === 'admin'
+                    ? 'bg-[#c9a84c] text-[#0a0e1a]'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Admin
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             {error && (
@@ -184,10 +187,21 @@ export function Login() {
 
           {/* Sign Up Link */}
           <div className="mt-6 text-center">
-            <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Don't have an account? </span>
-            <Link to="/signup" className="text-[#c9a84c] hover:text-[#b89640] transition-colors">
-              Sign up
-            </Link>
+            {userType === 'client' ? (
+              <>
+                <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Don't have an account? </span>
+                <Link to="/signup" className="text-[#c9a84c] hover:text-[#b89640] transition-colors">
+                  Sign up
+                </Link>
+              </>
+            ) : (
+              <>
+                <span style={{ color: 'rgba(255, 255, 255, 0.6)' }}>Client account? </span>
+                <Link to="/login" className="text-[#c9a84c] hover:text-[#b89640] transition-colors">
+                  Go to client login
+                </Link>
+              </>
+            )}
           </div>
         </div>
 

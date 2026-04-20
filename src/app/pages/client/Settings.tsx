@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react';
 import { User, Bell, Shield, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
-import { authService, customerService } from '../../lib/services';
+import { customerService } from '../../lib/services';
 import { useAuth } from '../../lib/auth';
 
 export function Settings() {
   const { session, updateSessionUser } = useAuth();
-  const [profile, setProfile] = useState({ fullName: '', email: '', phone: '' });
+  const [profile, setProfile] = useState({ fullName: '', email: '' });
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [language, setLanguage] = useState('en');
   const [currency, setCurrency] = useState('USD');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -25,23 +23,13 @@ export function Settings() {
       try {
         setLoading(true);
         setError('');
-        const [nextProfile, security, notifications, preferences] = await Promise.all([
-          customerService.getProfile(),
-          customerService.getSecurity(),
-          customerService.getNotifications(),
-          customerService.getPreferences(),
-        ]);
+        const nextProfile = await customerService.getProfile();
 
         if (!active) {
           return;
         }
 
         setProfile(nextProfile);
-        setTwoFactorEnabled(security.twoFactorEnabled);
-        setEmailNotifications(notifications.emailNotifications);
-        setPushNotifications(notifications.pushNotifications);
-        setLanguage(preferences.language);
-        setCurrency(preferences.currency);
       } catch (err) {
         if (active) {
           setError(err instanceof Error ? err.message : 'Unable to load settings.');
@@ -69,7 +57,11 @@ export function Settings() {
     try {
       setError('');
       await customerService.updateProfile(profile);
-      updateSessionUser({ ...session?.user, ...profile });
+      updateSessionUser({
+        ...session?.user,
+        fullName: profile.fullName,
+        email: profile.email,
+      });
       showSuccess('Profile updated.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save profile.');
@@ -77,38 +69,18 @@ export function Settings() {
   }
 
   async function saveSecurity() {
-    try {
-      setError('');
-      await customerService.updateSecurity({ twoFactorEnabled });
-      if (currentPassword && newPassword) {
-        await authService.changePassword({ currentPassword, newPassword });
-        setCurrentPassword('');
-        setNewPassword('');
-      }
-      showSuccess('Security settings updated.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save security settings.');
-    }
+    setError('');
+    showSuccess('Security preferences are UI-only because this API currently exposes profile updates only.');
   }
 
   async function saveNotifications() {
-    try {
-      setError('');
-      await customerService.updateNotifications({ emailNotifications, pushNotifications });
-      showSuccess('Notification preferences updated.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save notification preferences.');
-    }
+    setError('');
+    showSuccess('Notification preferences are stored only in the current session.');
   }
 
   async function savePreferences() {
-    try {
-      setError('');
-      await customerService.updatePreferences({ language, currency });
-      showSuccess('Preferences updated.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save preferences.');
-    }
+    setError('');
+    showSuccess('Language and currency preferences are UI-only with the current API contract.');
   }
 
   return (
@@ -168,17 +140,6 @@ export function Settings() {
                 className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
               />
             </div>
-            <div>
-              <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                Phone Number
-              </label>
-              <input
-                type="tel"
-                value={profile.phone}
-                onChange={(event) => setProfile((current) => ({ ...current, phone: event.target.value }))}
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all"
-              />
-            </div>
             <button onClick={() => void saveProfile()} className="px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105">
               Save Changes
             </button>
@@ -198,10 +159,13 @@ export function Settings() {
             </h2>
           </div>
 
-          <div className="space-y-6">
-            <div className="flex items-center justify-between py-3 border-b border-white/10">
-              <div>
-                <div style={{ color: '#ffffff' }} className="mb-1">
+            <div className="space-y-6">
+              <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+                The connected backend currently exposes automatic token refresh and profile updates, but not dedicated security endpoints.
+              </div>
+              <div className="flex items-center justify-between py-3 border-b border-white/10">
+                <div>
+                  <div style={{ color: '#ffffff' }} className="mb-1">
                   Two-Factor Authentication
                 </div>
                 <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }}>
@@ -220,23 +184,6 @@ export function Settings() {
                   }`}
                 />
               </button>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                placeholder="Current password"
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white placeholder:text-white/30 focus:border-[#c9a84c] focus:outline-none transition-all"
-              />
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(event) => setNewPassword(event.target.value)}
-                placeholder="New password"
-                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white placeholder:text-white/30 focus:border-[#c9a84c] focus:outline-none transition-all"
-              />
             </div>
 
             <button onClick={() => void saveSecurity()} className="w-full px-6 py-3 border border-[#c9a84c]/40 text-white rounded-lg hover:border-[#c9a84c] transition-all">

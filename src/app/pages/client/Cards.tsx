@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CreditCard, Lock, Unlock } from 'lucide-react';
+import { CreditCard, Lock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { customerService, formatters } from '../../lib/services';
 
@@ -40,40 +40,20 @@ export function Cards() {
   const isFrozen = Boolean(card?.frozen);
 
   async function toggleFreeze() {
-    if (!card) {
+    if (!card || card.frozen) {
       return;
     }
 
     try {
       setActionLoading(true);
       setError('');
-      if (card.frozen) {
-        await customerService.unfreezeCard(card.id);
-      } else {
-        await customerService.freezeCard(card.id);
-      }
+      await customerService.freezeCard(card.id);
 
       setCards((current) =>
-        current.map((item) => (item.id === card.id ? { ...item, frozen: !item.frozen } : item)),
+        current.map((item) => (item.id === card.id ? { ...item, frozen: true } : item)),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update card status.');
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function requestReplacement() {
-    if (!card) {
-      return;
-    }
-
-    try {
-      setActionLoading(true);
-      setError('');
-      await customerService.replaceCard(card.id, 'Card damaged');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to request a replacement card.');
     } finally {
       setActionLoading(false);
     }
@@ -187,7 +167,7 @@ export function Cards() {
                   Card Status
                 </h3>
                 <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }}>
-                  {isFrozen ? 'Your card is currently frozen' : 'Your card is active'}
+                  {isFrozen ? 'Your card is currently frozen' : 'Your card is active and can be frozen from this screen'}
                 </p>
               </div>
               <div
@@ -201,11 +181,11 @@ export function Cards() {
 
             <button
               onClick={() => void toggleFreeze()}
-              disabled={actionLoading}
+              disabled={actionLoading || isFrozen}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-[#c9a84c]/40 bg-[#c9a84c]/20 px-6 py-3 text-[#c9a84c] transition-all hover:bg-[#c9a84c]/30"
             >
-              {isFrozen ? <Unlock className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-              <span>{actionLoading ? 'Updating...' : isFrozen ? 'Unfreeze Card' : 'Freeze Card'}</span>
+              <Lock className="h-5 w-5" />
+              <span>{actionLoading ? 'Updating...' : isFrozen ? 'Card Frozen' : 'Freeze Card'}</span>
             </button>
           </motion.div>
 
@@ -244,13 +224,9 @@ export function Cards() {
               </div>
             </div>
 
-            <button
-              onClick={() => void requestReplacement()}
-              disabled={actionLoading}
-              className="mt-6 w-full rounded-lg bg-[#c9a84c] px-6 py-3 text-[#0a0e1a] transition-all hover:scale-105 hover:bg-[#b89640]"
-            >
-              {actionLoading ? 'Processing...' : 'Request New Card'}
-            </button>
+            <div className="mt-6 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/70">
+              The connected API currently supports card listing and freezing from this screen.
+            </div>
           </motion.div>
         </div>
       )}

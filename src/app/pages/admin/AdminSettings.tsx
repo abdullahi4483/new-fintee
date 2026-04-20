@@ -69,6 +69,9 @@ export function AdminSettings() {
           {success}
         </div>
       )}
+      <div className="mb-6 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white/70">
+        The current admin API supports users, withdrawals, and support replies. These platform-wide settings are shown as placeholders and are not persisted server-side.
+      </div>
 
       <div className="max-w-3xl space-y-6">
         <motion.div

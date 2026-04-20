@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, MessageCircle, Mail, Clock, CheckCircle, X } from 'lucide-react';
+import { Search, Filter, MessageCircle, Mail, Clock, X } from 'lucide-react';
 import { motion } from 'motion/react';
 import { adminService } from '../../lib/services';
 
@@ -57,16 +57,6 @@ export function Messages() {
     }
   }
 
-  async function resolveSelected(messageId: string) {
-    try {
-      setError('');
-      await adminService.resolveMessage(messageId);
-      setMessages((current) => current.map((msg) => (msg.id === messageId ? { ...msg, status: 'Resolved' } : msg)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to resolve message.');
-    }
-  }
-
   const filteredMessages = messages.filter((msg) => {
     const matchesSearch =
       msg.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -80,7 +70,6 @@ export function Messages() {
     total: messages.length,
     pending: messages.filter((m) => m.status === 'Pending').length,
     replied: messages.filter((m) => m.status === 'Replied').length,
-    resolved: messages.filter((m) => m.status === 'Resolved').length,
   };
 
   return (
@@ -98,7 +87,7 @@ export function Messages() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -143,20 +132,6 @@ export function Messages() {
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="p-6 rounded-xl bg-gradient-to-br from-[#141e32]/60 to-[#0a0e1a]/60 backdrop-blur-xl border border-[#c9a84c]/20"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Resolved</span>
-            <CheckCircle className="w-5 h-5 text-[#10b981]" />
-          </div>
-          <div className="font-heading" style={{ fontSize: '32px', color: '#10b981' }}>
-            {stats.resolved}
-          </div>
-        </motion.div>
       </div>
 
       <div className="mb-6 flex flex-col md:flex-row gap-4">
@@ -180,7 +155,6 @@ export function Messages() {
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
             <option value="replied">Replied</option>
-            <option value="resolved">Resolved</option>
           </select>
         </div>
       </div>
@@ -349,9 +323,6 @@ export function Messages() {
                     <div className="flex gap-3">
                       <button onClick={() => void replyToSelected(msg.id)} className="flex-1 px-6 py-3 bg-[#c9a84c] text-[#0a0e1a] rounded-lg hover:bg-[#b89640] transition-all hover:scale-105">
                         Send Reply
-                      </button>
-                      <button onClick={() => void resolveSelected(msg.id)} className="px-6 py-3 border border-[#10b981]/40 text-[#10b981] rounded-lg hover:border-[#10b981] transition-all">
-                        Mark Resolved
                       </button>
                     </div>
                   </div>

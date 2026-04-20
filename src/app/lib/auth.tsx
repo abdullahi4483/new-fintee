@@ -45,10 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           auth: false,
           body: { email, password },
         });
-        const nextSession = normalizeSession(payload, roleHint);
+        const nextSession = normalizeSession(payload, "client");
 
         if (roleHint === "admin" && nextSession.role !== "admin") {
-          throw new Error("This account does not have admin access.");
+          throw new Error("Admin login failed. This account is not an admin account.");
         }
 
         saveSession(nextSession);
@@ -59,23 +59,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await apiRequest("/auth/signup", {
           method: "POST",
           auth: false,
-          body: { fullName, email, phone, password },
+          body: {
+            email,
+            password,
+            fullName,
+          },
         });
       },
       async logout() {
-        const refreshToken = session?.refreshToken;
-        try {
-          if (refreshToken) {
-            await apiRequest("/auth/logout", {
-              method: "POST",
-              auth: false,
-              body: { refreshToken },
-            });
-          }
-        } finally {
-          saveSession(null);
-          setSession(null);
-        }
+        saveSession(null);
+        setSession(null);
       },
       updateSessionUser(user) {
         setSession((current) => {
@@ -114,11 +107,22 @@ export function RequireAuth({
   const location = useLocation();
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate
+        to={role === "admin" ? "/admin/login" : "/login"}
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
   }
 
   if (session?.role !== role) {
-    return <Navigate to={session?.role === "admin" ? "/admin" : "/dashboard"} replace />;
+    return (
+      <Navigate
+        to={role === "admin" ? "/admin/login" : session?.role === "admin" ? "/admin" : "/dashboard"}
+        replace
+      />
+    );
   }
 
   return <>{children}</>;

@@ -67,31 +67,28 @@ export function DashboardOverview() {
     requestType: 'WITHDRAWAL' | 'TRANSFER';
     accountId: string;
     amount: string;
-    currency: string;
-    note: string;
+    accountNumber: string;
+    bankCode: string;
   }) {
     try {
       setSubmittingWithdrawal(true);
       setWithdrawError('');
-      const selectedAccount =
-        accountCards.find((account) => account.id === input.accountId) ?? accountCards[0] ?? null;
-      const requestLabel =
-        input.requestType === 'TRANSFER' ? 'Transfer Verification Request' : 'Withdrawal Verification Request';
-
-      await customerService.sendSupportMessage({
-        category: input.requestType === 'TRANSFER' ? 'TRANSACTION' : 'WITHDRAWAL',
-        subject: requestLabel,
-        message: [
-          `Request type: ${input.requestType}`,
-          `Account: ${selectedAccount?.name ?? 'N/A'} (${selectedAccount?.accountNumber ?? input.accountId})`,
-          `Amount: ${input.currency} ${input.amount || '0'}`,
-          input.note ? `Customer note: ${input.note}` : 'Customer note: Verification requested from client portal.',
-        ].join('\n'),
+      await customerService.createWithdrawal({
+        amount: input.amount,
+        accountNumber: input.accountNumber,
+        bankCode: input.bankCode,
       });
       setIsWithdrawModalOpen(false);
       setWithdrawError('');
+
+      const [dashboardSummary, fetchedTransactions] = await Promise.all([
+        customerService.getDashboardSummary(),
+        customerService.getTransactions(),
+      ]);
+      setSummary(dashboardSummary);
+      setTransactions(fetchedTransactions);
     } catch (err) {
-      setWithdrawError(err instanceof Error ? err.message : 'Unable to contact customer support.');
+      setWithdrawError(err instanceof Error ? err.message : 'Unable to submit the withdrawal request.');
     } finally {
       setSubmittingWithdrawal(false);
     }
@@ -174,7 +171,7 @@ export function DashboardOverview() {
           <div className="font-heading" style={{ fontSize: '18px', color: '#ffffff' }}>
             Withdraw
           </div>
-          <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }}>Contact support for withdrawal or transfer verification</p>
+          <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }}>Submit a withdrawal request to the live API</p>
         </motion.button>
       </div>
 

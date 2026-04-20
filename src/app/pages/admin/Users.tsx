@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, MoreVertical, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { adminService, AdminUserRecord } from '../../lib/services';
+import { ApiError } from '../../lib/api';
 
 const ADMIN_USERS_STORAGE_KEY = 'fintech.admin.users';
 
@@ -109,6 +110,12 @@ export function Users() {
         setUsers(mergeUsers(data, storedUsers));
       } catch (err) {
         if (active) {
+          if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+            setUsers([]);
+            setError(err.message);
+            return;
+          }
+
           const storedUsers = loadStoredUsers();
           setUsers(storedUsers);
           setError(
@@ -138,7 +145,12 @@ export function Users() {
       const data = await adminService.getUsers();
       const storedUsers = loadStoredUsers();
       setUsers(mergeUsers(data, storedUsers));
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        setUsers([]);
+        throw err;
+      }
+
       setUsers(loadStoredUsers());
     }
   }
@@ -188,6 +200,10 @@ export function Users() {
     try {
       setEditError('');
       const details = await adminService.getUserById(user.id);
+      if (!details) {
+        setEditError('Detailed user lookups are not exposed by the current API.');
+        return;
+      }
       setEditForm({
         fullName: details.name,
         email: details.email,
@@ -292,7 +308,7 @@ export function Users() {
         });
         await reloadUsers();
       } catch {
-        setCreateError('User saved locally in your browser. Server create request failed.');
+        setCreateError('User saved locally in your browser. The API only supports basic signup for new users.');
       }
 
       setShowCreateModal(false);

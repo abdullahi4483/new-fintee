@@ -1,4 +1,4 @@
-const DEFAULT_BASE_URL = "http://localhost:3000/api/v1";
+const DEFAULT_BASE_URL = "https://api-node-project-2xjc.onrender.com/api/v1";
 const STORAGE_KEY = "fintech.session";
 const SESSION_EVENT = "fintech:session-change";
 
@@ -114,7 +114,15 @@ function getErrorMessage(payload: unknown, fallback: string) {
 
 async function parseResponse(response: Response) {
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  let payload: unknown = null;
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = text;
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(
@@ -293,6 +301,24 @@ export function toRole(value: unknown, fallback: AppRole = "client"): AppRole {
 export function normalizeSession(payload: unknown, fallbackRole: AppRole = "client"): StoredSession {
   const data = unwrapData<Record<string, unknown>>(payload);
   const user = pickObject<Record<string, unknown>>(payload, ["user", "profile"]);
+  const firstName =
+    typeof user?.firstName === "string"
+      ? user.firstName
+      : typeof data?.firstName === "string"
+        ? data.firstName
+        : "";
+  const lastName =
+    typeof user?.lastName === "string"
+      ? user.lastName
+      : typeof data?.lastName === "string"
+        ? data.lastName
+        : "";
+  const fullName =
+    typeof user?.fullName === "string"
+      ? user.fullName
+      : typeof user?.name === "string"
+        ? user.name
+        : [firstName, lastName].filter(Boolean).join(" ");
 
   const accessToken =
     typeof data?.accessToken === "string"
@@ -310,15 +336,25 @@ export function normalizeSession(payload: unknown, fallbackRole: AppRole = "clie
     role,
     user: {
       id: typeof user?.id === "string" ? user.id : typeof user?._id === "string" ? user._id : undefined,
-      fullName:
-        typeof user?.fullName === "string"
-          ? user.fullName
-          : typeof user?.name === "string"
-            ? user.name
+      fullName: fullName || undefined,
+      email:
+        typeof user?.email === "string"
+          ? user.email
+          : typeof data?.email === "string"
+            ? data.email
             : undefined,
-      email: typeof user?.email === "string" ? user.email : undefined,
-      phone: typeof user?.phone === "string" ? user.phone : undefined,
-      role: typeof user?.role === "string" ? user.role : undefined,
+      phone:
+        typeof user?.phone === "string"
+          ? user.phone
+          : typeof data?.phone === "string"
+            ? data.phone
+            : undefined,
+      role:
+        typeof user?.role === "string"
+          ? user.role
+          : typeof data?.role === "string"
+            ? data.role
+            : undefined,
     },
   };
 }

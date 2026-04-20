@@ -6,7 +6,6 @@ import { customerService } from '../../lib/services';
 export function Support() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [category, setCategory] = useState('GENERAL');
   const [submitted, setSubmitted] = useState(false);
   const [messages, setMessages] = useState<Awaited<ReturnType<typeof customerService.getSupportMessages>>>([]);
   const [loading, setLoading] = useState(true);
@@ -45,13 +44,16 @@ export function Support() {
     try {
       setIsSubmitting(true);
       setError('');
-      await customerService.sendSupportMessage({ category, subject, message });
-      const refreshedMessages = await customerService.getSupportMessages();
-      setMessages(refreshedMessages);
+      await customerService.sendSupportMessage({ subject, message });
+      try {
+        const refreshedMessages = await customerService.getSupportMessages();
+        setMessages(refreshedMessages);
+      } catch {
+        setMessages((current) => current);
+      }
       setSubmitted(true);
       setSubject('');
       setMessage('');
-      setCategory('GENERAL');
       window.setTimeout(() => setSubmitted(false), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to send your message.');
@@ -150,24 +152,6 @@ export function Support() {
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
-                  Category
-                </label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-[#c9a84c]/20 text-white focus:border-[#c9a84c] focus:outline-none transition-all appearance-none cursor-pointer"
-                >
-                  <option value="GENERAL">General Inquiry</option>
-                  <option value="ACCOUNT">Account Issue</option>
-                  <option value="TRANSACTION">Transaction Problem</option>
-                  <option value="WITHDRAWAL">Withdrawal Request</option>
-                  <option value="TECHNICAL">Technical Support</option>
-                  <option value="FEEDBACK">Feedback</option>
-                </select>
-              </div>
-
               <div>
                 <label className="block mb-2" style={{ color: 'rgba(255, 255, 255, 0.7)' }}>
                   Subject

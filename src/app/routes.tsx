@@ -27,7 +27,15 @@ export const router = createBrowserRouter([
     path: "/login",
     Component: () => (
       <GuestOnly>
-        <Login />
+        <Login portal="client" />
+      </GuestOnly>
+    ),
+  },
+  {
+    path: "/admin/login",
+    Component: () => (
+      <GuestOnly>
+        <Login portal="admin" />
       </GuestOnly>
     ),
   },
